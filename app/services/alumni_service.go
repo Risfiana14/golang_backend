@@ -3,9 +3,10 @@ package services
 import (
 	"database/sql"
 	"strconv"
+	"strings"
 	"tugas5/app/model"
 	"tugas5/app/repository"
-	"strings"
+
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -34,12 +35,22 @@ func (s *AlumniService) GetAllService(c *fiber.Ctx) error {
 		order = "asc"
 	}
 
-	data, err := s.repo.GetAll(search, sortBy, order, limit, offset)
+	alumni, err := s.repo.GetAll(search, sortBy, order, limit, offset)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	return c.JSON(fiber.Map{"success": true, "data": data})
+	response := model.AlumnResponse{
+		Data: alumni,
+		Meta: model.MetaInfo{
+			Page:   page,
+			Limit:  limit,
+			SortBy: sortBy,
+			Order:  order,
+			Search: search,
+		},
+	}
+	return c.JSON(response)
 }
 
 func (s *AlumniService) GetByIDService(c *fiber.Ctx) error {

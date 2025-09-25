@@ -1,10 +1,10 @@
 package repository
 
 import (
-	"tugas5/app/model"
 	"database/sql"
-	"time"
 	"fmt"
+	"time"
+	"tugas5/app/model"
 )
 
 type AlumniRepository interface {
@@ -27,7 +27,7 @@ func (r *alumniRepository) GetAll(search, sortBy, order string, limit, offset in
 	query := fmt.Sprintf(`
 	SELECT id, nim, nama, jurusan, angkatan, tahun_lulus, email, no_telepon, alamat, created_at, updated_at
 	FROM alumni
-	WHERE nama ILIKE $1 OR email ILIKE $1
+	WHERE nama ILIKE $1 OR email ILIKE $1 OR jurusan ILIKE $1 OR nim ILIKE $1
 	ORDER BY %s %s
 	LIMIT $2 OFFSET $3
 	`, sortBy, order)
