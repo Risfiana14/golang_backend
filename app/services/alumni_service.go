@@ -40,7 +40,7 @@ func (s *AlumniService) GetAllService(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	response := model.AlumnResponse{
+	response := model.AlumniResponse{
 		Data: alumni,
 		Meta: model.MetaInfo{
 			Page:   page,

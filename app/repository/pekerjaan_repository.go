@@ -2,12 +2,13 @@ package repository
 
 import (
 	"database/sql"
+	"fmt"
 	"time"
 	"tugas5/app/model"
 )
 
 type PekerjaanRepository interface {
-	GetAll() ([]model.Pekerjaan, error)
+	GetAll(search, sortBy, order string, limit, offset int) ([]model.Pekerjaan, error)
 	GetByID(id int) (*model.Pekerjaan, error)
 	GetByAlumniID(alumniID int) ([]model.Pekerjaan, error)
 	Create(req model.CreatePekerjaanRequest) (*model.Pekerjaan, error)
@@ -23,14 +24,19 @@ func NewPekerjaanRepository(db *sql.DB) PekerjaanRepository {
 	return &pekerjaanRepository{db: db}
 }
 
-func (r *pekerjaanRepository) GetAll() ([]model.Pekerjaan, error) {
-	rows, err := r.db.Query(`
+// GetAll dengan pagination, search, dan sorting
+func (r *pekerjaanRepository) GetAll(search, sortBy, order string, limit, offset int) ([]model.Pekerjaan, error) {
+	query := fmt.Sprintf(`
 		SELECT id, alumni_id, nama_perusahaan, posisi_jabatan, bidang_industri, lokasi_kerja, 
 		       gaji_range, tanggal_mulai_kerja, tanggal_selesai_kerja, status_pekerjaan, 
 		       deskripsi_pekerjaan, created_at, updated_at
 		FROM pekerjaan
-		ORDER BY created_at DESC
-	`)
+		WHERE nama_perusahaan ILIKE $1 OR posisi_jabatan ILIKE $1
+		ORDER BY %s %s
+		LIMIT $2 OFFSET $3
+	`, sortBy, order)
+
+	rows, err := r.db.Query(query, "%"+search+"%", limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -39,12 +45,11 @@ func (r *pekerjaanRepository) GetAll() ([]model.Pekerjaan, error) {
 	var pekerjaanList []model.Pekerjaan
 	for rows.Next() {
 		var p model.Pekerjaan
-		err := rows.Scan(
+		if err := rows.Scan(
 			&p.ID, &p.AlumniID, &p.NamaPerusahaan, &p.PosisiJabatan, &p.BidangIndustri,
 			&p.LokasiKerja, &p.GajiRange, &p.TanggalMulaiKerja, &p.TanggalSelesaiKerja,
 			&p.StatusPekerjaan, &p.DeskripsiPekerjaan, &p.CreatedAt, &p.UpdatedAt,
-		)
-		if err != nil {
+		); err != nil {
 			return nil, err
 		}
 		pekerjaanList = append(pekerjaanList, p)
@@ -90,12 +95,11 @@ func (r *pekerjaanRepository) GetByAlumniID(alumniID int) ([]model.Pekerjaan, er
 	var pekerjaanList []model.Pekerjaan
 	for rows.Next() {
 		var p model.Pekerjaan
-		err := rows.Scan(
+		if err := rows.Scan(
 			&p.ID, &p.AlumniID, &p.NamaPerusahaan, &p.PosisiJabatan, &p.BidangIndustri,
 			&p.LokasiKerja, &p.GajiRange, &p.TanggalMulaiKerja, &p.TanggalSelesaiKerja,
 			&p.StatusPekerjaan, &p.DeskripsiPekerjaan, &p.CreatedAt, &p.UpdatedAt,
-		)
-		if err != nil {
+		); err != nil {
 			return nil, err
 		}
 		pekerjaanList = append(pekerjaanList, p)
@@ -107,7 +111,6 @@ func (r *pekerjaanRepository) Create(req model.CreatePekerjaanRequest) (*model.P
 	var id int
 	var tanggalMulai, tanggalSelesai *time.Time
 
-	// Parse tanggal mulai
 	if req.TanggalMulaiKerja != "" {
 		t, err := time.Parse("2006-01-02", req.TanggalMulaiKerja)
 		if err != nil {
@@ -116,7 +119,6 @@ func (r *pekerjaanRepository) Create(req model.CreatePekerjaanRequest) (*model.P
 		tanggalMulai = &t
 	}
 
-	// Parse tanggal selesai jika ada
 	if req.TanggalSelesaiKerja != nil && *req.TanggalSelesaiKerja != "" {
 		t, err := time.Parse("2006-01-02", *req.TanggalSelesaiKerja)
 		if err != nil {
@@ -127,8 +129,8 @@ func (r *pekerjaanRepository) Create(req model.CreatePekerjaanRequest) (*model.P
 
 	err := r.db.QueryRow(`
 		INSERT INTO pekerjaan (alumni_id, nama_perusahaan, posisi_jabatan, bidang_industri, 
-		                             lokasi_kerja, gaji_range, tanggal_mulai_kerja, tanggal_selesai_kerja, 
-		                             status_pekerjaan, deskripsi_pekerjaan, created_at, updated_at)
+		                       lokasi_kerja, gaji_range, tanggal_mulai_kerja, tanggal_selesai_kerja, 
+		                       status_pekerjaan, deskripsi_pekerjaan, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		RETURNING id
 	`, req.AlumniID, req.NamaPerusahaan, req.PosisiJabatan, req.BidangIndustri, req.LokasiKerja,
@@ -145,7 +147,6 @@ func (r *pekerjaanRepository) Create(req model.CreatePekerjaanRequest) (*model.P
 func (r *pekerjaanRepository) Update(id int, req model.UpdatePekerjaanRequest) (*model.Pekerjaan, error) {
 	var tanggalMulai, tanggalSelesai *time.Time
 
-	// Parse tanggal mulai
 	if req.TanggalMulaiKerja != "" {
 		t, err := time.Parse("2006-01-02", req.TanggalMulaiKerja)
 		if err != nil {
@@ -154,7 +155,6 @@ func (r *pekerjaanRepository) Update(id int, req model.UpdatePekerjaanRequest) (
 		tanggalMulai = &t
 	}
 
-	// Parse tanggal selesai jika ada
 	if req.TanggalSelesaiKerja != nil && *req.TanggalSelesaiKerja != "" {
 		t, err := time.Parse("2006-01-02", *req.TanggalSelesaiKerja)
 		if err != nil {

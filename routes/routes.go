@@ -37,10 +37,10 @@ func UserRoutes(app *fiber.App) {
 	protected.Delete("/alumni/:id", middleware.AuthRequired(), alumniSvc.DeleteService)
 
 	// ---------- PEKERJAAN ----------
-	protected.Get("/pekerjaan", pekerjaanSvc.GetAllHandler)
-	protected.Get("/pekerjaan/:id", pekerjaanSvc.GetByIDHandler)
-	protected.Get("/pekerjaan/alumni/:alumni_id", pekerjaanSvc.GetByAlumniIDHandler)
-	protected.Post("/pekerjaan", middleware.AuthRequired(), pekerjaanSvc.CreateHandler)
-	protected.Put("/pekerjaan/:id", middleware.AuthRequired(), pekerjaanSvc.UpdateHandler)
-	protected.Delete("/pekerjaan/:id", middleware.AuthRequired(), pekerjaanSvc.DeleteHandler)
+	protected.Get("/pekerjaan", pekerjaanSvc.GetAllService)
+	protected.Get("/pekerjaan/:id", pekerjaanSvc.GetByIDService)
+	protected.Get("/pekerjaan/alumni/:alumni_id", pekerjaanSvc.GetByAlumniIDService)
+	protected.Post("/pekerjaan", middleware.AuthRequired(), pekerjaanSvc.CreateService)
+	protected.Put("/pekerjaan/:id", middleware.AuthRequired(), pekerjaanSvc.UpdateService)
+	protected.Delete("/pekerjaan/:id", middleware.AuthRequired(), pekerjaanSvc.DeleteService)
 }
