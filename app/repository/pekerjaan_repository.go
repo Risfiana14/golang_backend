@@ -29,9 +29,9 @@ func (r *pekerjaanRepository) GetAll(search, sortBy, order string, limit, offset
 	query := fmt.Sprintf(`
 		SELECT id, alumni_id, nama_perusahaan, posisi_jabatan, bidang_industri, lokasi_kerja, 
 		       gaji_range, tanggal_mulai_kerja, tanggal_selesai_kerja, status_pekerjaan, 
-		       deskripsi_pekerjaan, created_at, updated_at
+		       deskripsi_pekerjaan, created_at, updated_at, is_deleted, created_by
 		FROM pekerjaan
-		WHERE nama_perusahaan ILIKE $1 OR posisi_jabatan ILIKE $1
+		WHERE (nama_perusahaan ILIKE $1 OR posisi_jabatan ILIKE $1) AND is_deleted = false
 		ORDER BY %s %s
 		LIMIT $2 OFFSET $3
 	`, sortBy, order)
@@ -48,7 +48,7 @@ func (r *pekerjaanRepository) GetAll(search, sortBy, order string, limit, offset
 		if err := rows.Scan(
 			&p.ID, &p.AlumniID, &p.NamaPerusahaan, &p.PosisiJabatan, &p.BidangIndustri,
 			&p.LokasiKerja, &p.GajiRange, &p.TanggalMulaiKerja, &p.TanggalSelesaiKerja,
-			&p.StatusPekerjaan, &p.DeskripsiPekerjaan, &p.CreatedAt, &p.UpdatedAt,
+			&p.StatusPekerjaan, &p.DeskripsiPekerjaan, &p.CreatedAt, &p.UpdatedAt, &p.IsDeleted, &p.CreatedBy,
 		); err != nil {
 			return nil, err
 		}
@@ -62,15 +62,15 @@ func (r *pekerjaanRepository) GetByID(id int) (*model.Pekerjaan, error) {
 	row := r.db.QueryRow(`
 		SELECT id, alumni_id, nama_perusahaan, posisi_jabatan, bidang_industri, lokasi_kerja, 
 		       gaji_range, tanggal_mulai_kerja, tanggal_selesai_kerja, status_pekerjaan, 
-		       deskripsi_pekerjaan, created_at, updated_at
+		       deskripsi_pekerjaan, created_at, updated_at, is_deleted, created_by
 		FROM pekerjaan
-		WHERE id = $1
+		WHERE id = $1 AND is_deleted = false
 	`, id)
 
 	err := row.Scan(
 		&p.ID, &p.AlumniID, &p.NamaPerusahaan, &p.PosisiJabatan, &p.BidangIndustri,
 		&p.LokasiKerja, &p.GajiRange, &p.TanggalMulaiKerja, &p.TanggalSelesaiKerja,
-		&p.StatusPekerjaan, &p.DeskripsiPekerjaan, &p.CreatedAt, &p.UpdatedAt,
+		&p.StatusPekerjaan, &p.DeskripsiPekerjaan, &p.CreatedAt, &p.UpdatedAt, &p.IsDeleted, &p.CreatedBy,
 	)
 	if err != nil {
 		return nil, err
@@ -82,9 +82,9 @@ func (r *pekerjaanRepository) GetByAlumniID(alumniID int) ([]model.Pekerjaan, er
 	rows, err := r.db.Query(`
 		SELECT id, alumni_id, nama_perusahaan, posisi_jabatan, bidang_industri, lokasi_kerja, 
 		       gaji_range, tanggal_mulai_kerja, tanggal_selesai_kerja, status_pekerjaan, 
-		       deskripsi_pekerjaan, created_at, updated_at
+		       deskripsi_pekerjaan, created_at, updated_at, is_deleted, created_by
 		FROM pekerjaan
-		WHERE alumni_id = $1
+		WHERE alumni_id = $1 AND is_deleted = false
 		ORDER BY created_at DESC
 	`, alumniID)
 	if err != nil {
@@ -98,7 +98,7 @@ func (r *pekerjaanRepository) GetByAlumniID(alumniID int) ([]model.Pekerjaan, er
 		if err := rows.Scan(
 			&p.ID, &p.AlumniID, &p.NamaPerusahaan, &p.PosisiJabatan, &p.BidangIndustri,
 			&p.LokasiKerja, &p.GajiRange, &p.TanggalMulaiKerja, &p.TanggalSelesaiKerja,
-			&p.StatusPekerjaan, &p.DeskripsiPekerjaan, &p.CreatedAt, &p.UpdatedAt,
+			&p.StatusPekerjaan, &p.DeskripsiPekerjaan, &p.CreatedAt, &p.UpdatedAt, &p.IsDeleted, &p.CreatedBy,
 		); err != nil {
 			return nil, err
 		}
@@ -128,14 +128,15 @@ func (r *pekerjaanRepository) Create(req model.CreatePekerjaanRequest) (*model.P
 	}
 
 	err := r.db.QueryRow(`
-		INSERT INTO pekerjaan (alumni_id, nama_perusahaan, posisi_jabatan, bidang_industri, 
-		                       lokasi_kerja, gaji_range, tanggal_mulai_kerja, tanggal_selesai_kerja, 
-		                       status_pekerjaan, deskripsi_pekerjaan, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-		RETURNING id
+    INSERT INTO pekerjaan (alumni_id, nama_perusahaan, posisi_jabatan, bidang_industri,
+                           lokasi_kerja, gaji_range, tanggal_mulai_kerja, tanggal_selesai_kerja,
+                           status_pekerjaan, deskripsi_pekerjaan, created_at, updated_at, is_deleted, created_by)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,false,$13)
+    RETURNING id
 	`, req.AlumniID, req.NamaPerusahaan, req.PosisiJabatan, req.BidangIndustri, req.LokasiKerja,
-		req.GajiRange, tanggalMulai, tanggalSelesai, req.StatusPekerjaan, req.DeskripsiPekerjaan,
-		time.Now(), time.Now()).Scan(&id)
+    req.GajiRange, tanggalMulai, tanggalSelesai, req.StatusPekerjaan, req.DeskripsiPekerjaan,
+    time.Now(), time.Now(), req.CreatedBy).Scan(&id)
+
 
 	if err != nil {
 		return nil, err
@@ -186,15 +187,16 @@ func (r *pekerjaanRepository) Update(id int, req model.UpdatePekerjaanRequest) (
 }
 
 func (r *pekerjaanRepository) Delete(id int) error {
-	result, err := r.db.Exec("DELETE FROM pekerjaan WHERE id = $1", id)
-	if err != nil {
-		return err
-	}
+    result, err := r.db.Exec("UPDATE pekerjaan SET is_deleted = true, updated_at = $2 WHERE id = $1", id, time.Now())
+    if err != nil {
+        return err
+    }
 
-	rowsAffected, _ := result.RowsAffected()
-	if rowsAffected == 0 {
-		return sql.ErrNoRows
-	}
+    rowsAffected, _ := result.RowsAffected()
+    if rowsAffected == 0 {
+        return sql.ErrNoRows
+    }
 
-	return nil
+    return nil
 }
+

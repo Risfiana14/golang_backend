@@ -16,6 +16,8 @@ type Pekerjaan struct {
 	DeskripsiPekerjaan  *string    `json:"deskripsi_pekerjaan,omitempty"`
 	CreatedAt           time.Time  `json:"created_at"`
 	UpdatedAt           time.Time  `json:"updated_at"`
+	IsDeleted           bool       `json:"is_deleted"`
+	CreatedBy           *string     `json:"created_by"`
 }
 
 type CreatePekerjaanRequest struct {
@@ -29,6 +31,7 @@ type CreatePekerjaanRequest struct {
 	TanggalSelesaiKerja *string `json:"tanggal_selesai_kerja,omitempty"`
 	StatusPekerjaan     *string `json:"status_pekerjaan,omitempty"`
 	DeskripsiPekerjaan  *string `json:"deskripsi_pekerjaan,omitempty"`
+	CreatedBy           *string  `json:"created_by,omitempty"`
 }
 
 type UpdatePekerjaanRequest struct {

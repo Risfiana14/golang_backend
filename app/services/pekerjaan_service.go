@@ -7,6 +7,7 @@ import (
 	"time"
 	"tugas5/app/model"
 	"tugas5/app/repository"
+	"tugas5/utils"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -28,7 +29,6 @@ func (s *PekerjaanService) GetAllService(c *fiber.Ctx) error {
 	search := c.Query("search", "")
 	offset := (page - 1) * limit
 
-	// Validasi sortBy
 	sortByWhitelist := map[string]bool{
 		"id": true, "nama_perusahaan": true, "posisi_jabatan": true, "created_at": true,
 	}
@@ -93,7 +93,19 @@ func (s *PekerjaanService) CreateService(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Request body tidak valid"})
 	}
 
-	// Parsing tanggal mulai dan selesai
+	role := c.Locals("role").(string)
+	userID := c.Locals("user_id").(int)
+	username := c.Locals("username").(string)
+
+	// User biasa hanya bisa membuat pekerjaan untuk dirinya sendiri
+	if role != "admin" {
+		req.AlumniID = userID
+	}
+
+	// Simpan siapa yang membuat
+	req.CreatedBy = utils.StringPtr(username)
+
+	// Validasi tanggal
 	if req.TanggalMulaiKerja != "" {
 		t, err := time.Parse("2006-01-02", req.TanggalMulaiKerja)
 		if err != nil {
@@ -125,7 +137,7 @@ func (s *PekerjaanService) UpdateService(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Request body tidak valid"})
 	}
 
-	// Parsing tanggal mulai dan selesai
+	// Validasi tanggal
 	if req.TanggalMulaiKerja != "" {
 		t, err := time.Parse("2006-01-02", req.TanggalMulaiKerja)
 		if err != nil {
@@ -155,11 +167,33 @@ func (s *PekerjaanService) UpdateService(c *fiber.Ctx) error {
 // DELETE /pekerjaan/:id
 func (s *PekerjaanService) DeleteService(c *fiber.Ctx) error {
 	id, _ := strconv.Atoi(c.Params("id"))
+	role := c.Locals("role").(string)
+	username := c.Locals("username").(string)
+
+	pekerjaan, err := s.repo.GetByID(id)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return c.Status(404).JSON(fiber.Map{"error": "Pekerjaan tidak ditemukan"})
+		}
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	// Validasi hak akses: hanya admin atau pembuat (CreatedBy) yang boleh hapus
+	if role != "admin" && (pekerjaan.CreatedBy == nil || *pekerjaan.CreatedBy != username) {
+		return c.Status(403).JSON(fiber.Map{
+			"error": "Anda tidak memiliki izin untuk menghapus pekerjaan ini",
+		})
+	}
+
 	if err := s.repo.Delete(id); err != nil {
 		if err == sql.ErrNoRows {
 			return c.Status(404).JSON(fiber.Map{"error": "Pekerjaan tidak ditemukan"})
 		}
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
-	return c.JSON(fiber.Map{"success": true, "message": "Pekerjaan dihapus"})
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"message": "Pekerjaan berhasil dihapus (soft delete)",
+	})
 }
