@@ -97,15 +97,12 @@ func (s *PekerjaanService) CreateService(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(int)
 	username := c.Locals("username").(string)
 
-	// User biasa hanya bisa membuat pekerjaan untuk dirinya sendiri
 	if role != "admin" {
 		req.AlumniID = userID
 	}
 
-	// Simpan siapa yang membuat
 	req.CreatedBy = utils.StringPtr(username)
 
-	// Validasi tanggal
 	if req.TanggalMulaiKerja != "" {
 		t, err := time.Parse("2006-01-02", req.TanggalMulaiKerja)
 		if err != nil {
@@ -137,7 +134,6 @@ func (s *PekerjaanService) UpdateService(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Request body tidak valid"})
 	}
 
-	// Validasi tanggal
 	if req.TanggalMulaiKerja != "" {
 		t, err := time.Parse("2006-01-02", req.TanggalMulaiKerja)
 		if err != nil {
@@ -178,7 +174,6 @@ func (s *PekerjaanService) DeleteService(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	// Validasi hak akses: hanya admin atau pembuat (CreatedBy) yang boleh hapus
 	if role != "admin" && (pekerjaan.CreatedBy == nil || *pekerjaan.CreatedBy != username) {
 		return c.Status(403).JSON(fiber.Map{
 			"error": "Anda tidak memiliki izin untuk menghapus pekerjaan ini",
@@ -196,4 +191,103 @@ func (s *PekerjaanService) DeleteService(c *fiber.Ctx) error {
 		"success": true,
 		"message": "Pekerjaan berhasil dihapus (soft delete)",
 	})
+}
+
+// PUT /pekerjaan/restore/:id
+func (s *PekerjaanService) RestoreService(c *fiber.Ctx) error {
+	id, _ := strconv.Atoi(c.Params("id"))
+
+	roleVal := c.Locals("role")
+	usernameVal := c.Locals("username")
+
+	if roleVal == nil || usernameVal == nil {
+		return c.Status(401).JSON(fiber.Map{"error": "Unauthorized"})
+	}
+	role := roleVal.(string)
+	username := usernameVal.(string)
+
+	createdBy, isDeleted, err := s.repo.GetDeletedInfo(id)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return c.Status(404).JSON(fiber.Map{"error": "Data tidak ditemukan"})
+		}
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	if !isDeleted {
+		return c.Status(400).JSON(fiber.Map{"error": "Data belum dihapus"})
+	}
+	if role != "admin" && createdBy != username {
+		return c.Status(403).JSON(fiber.Map{"error": "Anda tidak berhak restore data ini"})
+	}
+
+	if err := s.repo.Restore(id); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"success": true, "message": "Data berhasil direstore"})
+}
+
+// DELETE /pekerjaan/hard-delete/:id
+func (s *PekerjaanService) HardDeleteService(c *fiber.Ctx) error {
+	id, _ := strconv.Atoi(c.Params("id"))
+
+	roleVal := c.Locals("role")
+	if roleVal == nil {
+		return c.Status(401).JSON(fiber.Map{"error": "Unauthorized"})
+	}
+	role := roleVal.(string)
+
+	if role != "admin" {
+		return c.Status(403).JSON(fiber.Map{"error": "Hanya admin yang dapat melakukan hard delete"})
+	}
+
+	if err := s.repo.HardDelete(id); err != nil {
+		if err == sql.ErrNoRows {
+			return c.Status(404).JSON(fiber.Map{"error": "Data tidak ditemukan"})
+		}
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"success": true, "message": "Data dihapus permanen"})
+}
+
+// GET /pekerjaan/trash
+	func (s *PekerjaanService) GetTrashService(c *fiber.Ctx) error {
+	roleVal := c.Locals("role")
+	usernameVal := c.Locals("username")
+
+	if roleVal == nil || usernameVal == nil {
+		return c.Status(401).JSON(fiber.Map{"error": "Unauthorized"})
+	}
+
+	role := roleVal.(string)
+	username := usernameVal.(string)
+
+	data, err := s.repo.GetTrash(role, username)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(fiber.Map{"success": true, "data": data})
+}
+
+// GET /pekerjaan/trash/:id
+	func (s *PekerjaanService) GetTrashByIDService(c *fiber.Ctx) error {
+	idStr := c.Params("id")
+	if idStr == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "ID diperlukan"})
+	}
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "ID tidak valid"})
+	}
+
+	data, err := s.repo.GetByIDFromTrash(id)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return c.Status(404).JSON(fiber.Map{"error": "Data tidak ditemukan di trash"})
+		}
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(fiber.Map{"success": true, "data": data})
 }

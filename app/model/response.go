@@ -1,4 +1,4 @@
-package model
+  package model
 
 // MetaInfo -> informasi pagination & filter
 type MetaInfo struct {

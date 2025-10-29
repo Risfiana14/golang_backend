@@ -10,7 +10,7 @@ import (
 )
 
 	// UserRoutes -> definisi route untuk user
-func UserRoutes(app *fiber.App) {
+	func UserRoutes(app *fiber.App) {
 	alumniRepo := repository.NewAlumniRepository(database.DB)
 	pekerjaanRepo := repository.NewPekerjaanRepository(database.DB)
 	
@@ -38,9 +38,14 @@ func UserRoutes(app *fiber.App) {
 
 	// ---------- PEKERJAAN ----------
 	protected.Get("/pekerjaan", pekerjaanSvc.GetAllService)
-	protected.Get("/pekerjaan/:id", pekerjaanSvc.GetByIDService)
+	protected.Get("/pekerjaan/trash", middleware.AuthRequired(), pekerjaanSvc.GetTrashService)
+	protected.Get("/pekerjaan/trash/:id", middleware.AuthRequired(), pekerjaanSvc.GetTrashByIDService)
 	protected.Get("/pekerjaan/alumni/:alumni_id", pekerjaanSvc.GetByAlumniIDService)
+	protected.Get("/pekerjaan/:id", pekerjaanSvc.GetByIDService)
 	protected.Post("/pekerjaan", middleware.AuthRequired(), pekerjaanSvc.CreateService)
 	protected.Put("/pekerjaan/:id", middleware.AuthRequired(), pekerjaanSvc.UpdateService)
 	protected.Delete("/pekerjaan/:id", middleware.AuthRequired(), pekerjaanSvc.DeleteService)
+	protected.Put("/pekerjaan/restore/:id", middleware.AuthRequired(), pekerjaanSvc.RestoreService)
+	protected.Delete("/pekerjaan/hard-delete/:id", middleware.AuthRequired(), pekerjaanSvc.HardDeleteService)
+
 }
